@@ -2,28 +2,16 @@
 
 ROON_PACKAGE_URI=${ROON_PACKAGE_URI-"http://download.roonlabs.com/builds/RoonBridge_linuxx64.tar.bz2"}
 
+echo Starting RoonBridge with user `whoami`
+
 # install Roon if not present
 if [ ! -f /opt/RoonBridge/start.sh ]; then
   echo Downloading Roon Bridge from ${ROON_PACKAGE_URI}
-  wget \
-    --show-progress \
-    --tries=2 \
-    -O /tmp/RoonBridge_linuxx64.tar.bz2 \
-    ${ROON_PACKAGE_URI}
+  wget --progress=bar:force --tries=2 -O - ${ROON_PACKAGE_URI} | tar -xvj --overwrite -C /opt
   if [ $? != 0 ]; then
     echo Error: Unable to download Roon Bridge.
     exit 1
   fi
-
-  echo Extracting Roon Bridge
-  tar -xvjf /tmp/RoonBridge_linuxx64.tar.bz2 -C /opt
-  if [ $? != 0 ]; then
-    echo Error: Unable to extract Roon Bridge.
-    exit 2
-  fi
-
-  # cleanup
-  rm /tmp/RoonBridge_linuxx64.tar.bz2
 fi
 
 echo Verifying Roon Bridge installation

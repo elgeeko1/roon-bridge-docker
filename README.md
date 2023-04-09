@@ -11,20 +11,20 @@ Roon Bridge in a docker container.
 
 # Running
 
-## Install prerequisites on the host
+## Install host prerequisites
 Install the following audio packages into your host:
 ```sh
 apt-get install alsa-utils libasound2 libasound2-data libasound2-plugins
 ```
 
-## Create persistent data directories in host filesystem
-The commands below require the following folders exist in your host filesystem:
-- `data` on your host which will be used for Roon's persistent storage. Example: `/home/myuser/roon/data`.
+### Create persistent data volumes
+Create persistent docker volumes to retain the binary installation of
+Roon Bridge and its configuration across restarts of the service.
 
-Create the persistent data directories in the host filesystem:
+Create the persistent docker volumes:
 ```sh
-mkdir -p ~/roon
-mkdir -p ~/roon/data
+docker volume create roon-bridge-data
+docker volume create roon-bridge-cache
 ```
 
 ## Option 1: Run in least secure mode (easiest)
@@ -32,7 +32,8 @@ Run using privileged execution mode and host network mode:
 ```sh
 docker run \
   --name roon-bridge \
-  --volume ~/roon/data:/var/roon \
+  --volume roon-bridge-data:/opt/RoonBridge \
+  --volume roon-bridge-cache:/var/roon \
   --network host \
   --privileged \
   elgeeko/roon-bridge
@@ -46,7 +47,7 @@ Replace the subnet, gateway and IP address to match your local network.
 ```sh
 docker network create \
   --driver macvlan \
-  --subnet 192.168.1.0 \
+  --subnet 192.168.1.0/24 \
   --gateway 192.168.1.1 \
   -o parent=eth0 \
   roon
@@ -56,8 +57,9 @@ docker network create \
 ```sh
 docker run \
   --name roon-bridge \
-  --publish_all \
-  --volume ~/roon/data:/var/roon \
+  --volume roon-bridge-data:/opt/RoonBridge \
+  --volume roon-bridge-cache:/var/roon \
+  --publish-all \
   --network roon \
   --ip 192.168.1.2 \
   elgeeko/roon-bridge
@@ -67,10 +69,10 @@ docker run \
 
 ### Use USB DACs connected to the host
 Add the following arguments to the `docker run` command:  
-`--volume /usr/share/alsa:/usr/share/alsa` - allow Roon to access ALSA cards  
 `--volume /run/udev:/run/udev:ro` - allow Roon to enumerate USB devices  
-`--device /dev/bus/usb` - allow Roon to access USB devices  
-`--device /dev/snd` - allow Roon to access ALSA devices  
+`--device /dev/bus/usb` - allow Roon to access USB devices (`/dev/usbmon0` for Fedora)   
+`--device /dev/snd` - allow Roon to access ALSA devices   
+`--group-add $(getent group audio | cut -d: -f3)` - add container user to host 'audio' group
 
 ### Synchronize filesystem and last.fm timestamps with your local timezone
 Add the following arguments to the `docker run` command:  
@@ -81,6 +83,9 @@ Add the following arguments to the `docker run` command:
 - USB DACs connected to the system for the first time do not appear in Roon.
 The workaround is to restart the container. Once the device has been initially
 connected, disconnecting and reconnecting is reflected in Roon.
+- Fedora CoreOS sets a system paramenter `ulimit` to a smaller value than Roon
+requires. Add the following argument to the `docker run` command:   
+`--ulimit nofile=8192`
 
 # Building from the Dockerfile
 `docker build .`
