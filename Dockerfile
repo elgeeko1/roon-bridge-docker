@@ -55,8 +55,6 @@ LABEL source="https://github.com/elgeeko1/roon-bridge-docker"
 EXPOSE 9003/udp
 #  - RAAT
 EXPOSE 9100-9200/tcp
-#  - Roon events from cloud to core (websocket?)
-#EXPOSE 9200/tcp
 
 USER root
 
