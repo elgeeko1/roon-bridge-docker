@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ROON_PACKAGE_URI="http://download.roonlabs.com/builds/RoonBridge_linuxx64.tar.bz2"
-if [ "$(uname -m)" = "armv8" ]; then
+if [ "$(uname -m)" = "aarch64" ]; then
   ROON_PACKAGE_URI="https://download.roonlabs.net/builds/RoonBridge_linuxarmv8.tar.bz2"
 fi
 
