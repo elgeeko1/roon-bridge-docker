@@ -1,5 +1,5 @@
 # Roon Bridge in Docker
-Roon Bridge in a docker container.
+Roon Bridge in a docker container. Supports aarch64 and amd64 targets.
 
 ### Features
 - Downloads and installs latest Roon Bridge on first container start
