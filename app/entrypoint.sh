@@ -1,8 +1,11 @@
 #!/bin/bash
 
-ROON_PACKAGE_URI=${ROON_PACKAGE_URI-"http://download.roonlabs.com/builds/RoonBridge_linuxx64.tar.bz2"}
+ROON_PACKAGE_URI="http://download.roonlabs.com/builds/RoonBridge_linuxx64.tar.bz2"
+if [ "$(uname -m)" = "aarch64" ]; then
+  ROON_PACKAGE_URI="https://download.roonlabs.net/builds/RoonBridge_linuxarmv8.tar.bz2"
+fi
 
-echo Starting RoonBridge with user `whoami`
+echo Starting RoonBridge as user `whoami`
 
 # install Roon if not present
 if [ ! -f /opt/RoonBridge/start.sh ]; then
