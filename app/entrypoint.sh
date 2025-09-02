@@ -1,9 +1,30 @@
 #!/bin/bash
 
-ROON_PACKAGE_URI="http://download.roonlabs.com/builds/RoonBridge_linuxx64.tar.bz2"
-if [ "$(uname -m)" = "aarch64" ]; then
-  ROON_PACKAGE_URI="https://download.roonlabs.net/builds/RoonBridge_linuxarmv8.tar.bz2"
+# SPDX-FileCopyrightText: (c) 2022-2025 Jeff C. Jensen
+# SPDX-License-Identifier: MIT
+
+# prefer userland package arch (Debian/Ubuntu); fallback to kernel arch
+if command -v dpkg >/dev/null 2>&1; then
+  arch="$(dpkg --print-architecture)"          # amd64 | arm64 | armhf | ...
+else
+  arch="$(uname -m)"                            # x86_64 | aarch64 | armv7l | ...
 fi
+
+case "$arch" in
+  amd64|x86_64)
+    ROON_PACKAGE_URI="https://download.roonlabs.com/builds/RoonBridge_linuxx64.tar.bz2"
+    ;;
+  arm64|aarch64)
+    ROON_PACKAGE_URI="https://download.roonlabs.com/builds/RoonBridge_linuxarmv8.tar.bz2"
+    ;;
+  armhf|armv7l|armv7hl|armv7)
+    ROON_PACKAGE_URI="https://download.roonlabs.com/builds/RoonBridge_linuxarmv7hf.tar.bz2"
+    ;;
+  *)
+    echo "Unsupported architecture: $arch" >&2
+    exit 1
+    ;;
+esac
 
 echo Starting RoonBridge as user `whoami`
 

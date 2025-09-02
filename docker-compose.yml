@@ -1,17 +1,27 @@
-version: '3'
+# SPDX-FileCopyrightText: (c) 2022-2025 Jeff C. Jensen
+# SPDX-License-Identifier: MIT
+
 services:
   roon:
     container_name: roon-bridge
+    build:
+      context: .
     image: elgeeko/roon-bridge:latest
     restart: unless-stopped
+    init: true
     network_mode: host
-    privileged: true
+    group_add:
+      - "${AUDIO_GID:-29}" # set AUDIO_GID=$(getent group audio | cut -d: -f3)
     user: roon
     volumes:
       - roon-bridge-data:/opt/RoonBridge
       - roon-bridge-cache:/var/roon
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
+    devices:
+      - /dev/bus/usb
+      - /dev/snd
+    volumes:
+      - /run/udev:/run/udev:ro
 
 volumes:
   roon-bridge-data:
@@ -20,23 +30,18 @@ volumes:
     name: roon-bridge-cache
 
 
-## if running in 'bridge' or 'macvlan' network mode,
+## if running in 'bridge' network mode,
 ## expose these ports:
 # ports:
 #   - "9003:9003/udp"               # multicast
-#   - "9100-9200:9100-9200/tcp"     # RAAT
+#   - "9100-9200:9100-9200/tcp"     # Roon API and RAAT
 #   - "9330-9339:9330-9339/tcp"     # ?
 
-## if the roon bridge will play from an onboard sound card
-# devices:
-#   - /dev/bus/usb
-#   - /dev/snd
+## try using this if roon is having trouble discovering devices
 # cap_add:
 #   - SYS_ADMIN
-#   - DAC_READ_SEARCH
-# volumes:
-#   - /run/udev:/run/udev:ro
-
-## try using this if roon is having trouble discovering devices
 # security_opt:
 #   - apparmor:unconfined
+
+## try this if all else fails
+# privileged: true

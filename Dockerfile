@@ -1,43 +1,42 @@
+# SPDX-FileCopyrightText: (c) 2021-2025 Jeff C. Jensen
+# SPDX-License-Identifier: MIT
+
 # syntax=docker/dockerfile:1
+
+ARG BUILDKIT_SBOM_SCAN_CONTEXT=true
+ARG BUILDKIT_SBOM_SCAN_STAGE=true
+ARG BASEIMAGE=noble-20250716
 
 ##################
 ## base stage
 ##################
-FROM ubuntu:jammy AS BASE
+FROM ubuntu:${BASEIMAGE} AS base
 
 USER root
 
 # Preconfigure debconf for non-interactive installation - otherwise complains about terminal
-# Avoid ERROR: invoke-rc.d: policy-rc.d denied execution of start.
-ARG DEBIAN_FRONTEND=noninteractive
-ARG DISPLAY localhost:0.0
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=localhost:0.0
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
-RUN dpkg-divert --local --rename --add /sbin/initctl
-RUN ln -sf /bin/true /sbin/initctl
-RUN echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d
+
+# configure python
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # configure apt
 RUN apt-get update -q
-RUN apt-get install --no-install-recommends -y -q apt-utils 2>&1 \
-	| grep -v "debconf: delaying package configuration"
 RUN apt-get install --no-install-recommends -y -q ca-certificates
 
 # install prerequisites
 # Roon prerequisites:
-#  - Roon requirements: libasound2 libicu70
+#  - Roon requirements: libasound2-dev
 #  - Roon play to local audio device: alsa
-#  - Query USB devices inside Docker container: usbutils udev
-RUN apt-get install --no-install-recommends -y -q libasound2
-RUN apt-get install --no-install-recommends -y -q libicu70
-RUN apt-get install --no-install-recommends -y -q alsa
-RUN apt-get install --no-install-recommends -y -q usbutils
-RUN apt-get install --no-install-recommends -y -q udev
+#  - Query USB devices inside Docker container: usbutils udev libudev1
+RUN apt-get install --no-install-recommends -y -q libasound2-dev alsa
+RUN apt-get install --no-install-recommends -y -q usbutils udev libudev1
 # app prerequisites
-#  - App entrypoint downloads Roon: wget bzip2
-#  - set timezone: tzdata
-RUN apt-get install --no-install-recommends -y -q wget
-RUN apt-get install --no-install-recommends -y -q bzip2
-RUN apt-get install --no-install-recommends -y -q tzdata
+#  - App entrypoint downloads Roon bridge: wget bzip2
+RUN apt-get install --no-install-recommends -y -q wget bzip2
 
 # apt cleanup
 RUN apt-get autoremove -y -q
@@ -48,27 +47,28 @@ RUN rm -rf /var/lib/apt/lists/*
 ## application stage
 ####################
 FROM scratch
-COPY --from=BASE / /
+COPY --from=base / /
+
 LABEL maintainer="elgeeko1"
 LABEL source="https://github.com/elgeeko1/roon-bridge-docker"
+LABEL org.opencontainers.image.title="Roon Bridge"
+LABEL org.opencontainers.description="Roon Bridge"
+LABEL org.opencontainers.image.authors="Jeff C. Jensen <11233838+elgeeko1@users.noreply.github.com>"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="1.1.0"
+LABEL org.opencontainers.image.url="https://hub.docker.com/r/elgeeko/roon-bridge"
+LABEL org.opencontainers.image.source="https://github.com/elgeeko1/roon-bridge-docker"
 
 # Roon documented ports
 #  - multicast (discovery?)
 EXPOSE 9003/udp
-#  - RAAT
+#  - Roon API and RAAT server
+#    see https://community.roonlabs.com/t/roon-api-on-build-880-connection-refused-error/181619/3
+#    - RAAT server typically :9200
 EXPOSE 9100-9200/tcp
+EXPOSE 9093/udp
 
 USER root
-
-# change to match your local zone.
-# matching container to host timezones synchronizes
-# last.fm posts, filesystem write times, and user
-# expectations for times shown in the Roon client.
-ARG TZ="America/Los_Angeles"
-ENV TZ=${TZ}
-RUN echo "${TZ}" > /etc/timezone \
-	&& ln -fs /usr/share/zoneinfo/${TZ} /etc/localtime \
-	&& dpkg-reconfigure -f noninteractive tzdata
 
 # non-root container user.
 # you may want to randomize the UID to prevent
@@ -77,34 +77,35 @@ RUN echo "${TZ}" > /etc/timezone \
 # accessing network shares that are not public,
 # or if the RoonServer build is mapped in from
 # the host filesystem.
-ARG CONTAINER_USER=roon
+ARG CONTAINER_USER=ubuntu
 ARG CONTAINER_USER_UID=1000
-RUN adduser --disabled-password --gecos "" --uid ${CONTAINER_USER_UID} ${CONTAINER_USER}
+RUN if [ "${CONTAINER_USER}" != "ubuntu" ]; \
+	then useradd \
+		--uid ${CONTAINER_USER_UID} \
+		--user-group \
+		${CONTAINER_USER}; \
+	fi
 
 # add container user to audio group
 RUN usermod -a -G audio ${CONTAINER_USER}
 
 # copy application files
-COPY app/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY --chmod=0755 app/entrypoint.sh /entrypoint.sh
 COPY README.md /README.md
 
 # configure filesystem
 ## map a volume to this location to retain Roon Bridge data
 RUN mkdir -p /opt/RoonBridge \
-	&& chown ${CONTAINER_USER} /opt/RoonBridge \
-	&& chgrp ${CONTAINER_USER} /opt/RoonBridge
+	&& chown ${CONTAINER_USER}:${CONTAINER_USER} /opt/RoonBridge
 ## map a volume to this location to retain Roon Bridge cache
 RUN mkdir -p /var/roon \
-	&& chown ${CONTAINER_USER} /var/roon \
-	&& chgrp ${CONTAINER_USER} /var/roon
+	&& chown ${CONTAINER_USER}:${CONTAINER_USER} /var/roon
 
 USER ${CONTAINER_USER}
 
 # entrypoint
 # set environment variables consumed by Roon
 # startup script
-ENV DISPLAY localhost:0.0
 ENV ROON_DATAROOT=/var/roon
 ENV ROON_ID_DIR=/var/roon
 ENTRYPOINT ["/entrypoint.sh"]
