@@ -17,11 +17,10 @@ services:
       - roon-bridge-data:/opt/RoonBridge
       - roon-bridge-cache:/var/roon
       - /etc/localtime:/etc/localtime:ro
+      - /run/udev:/run/udev:ro
     devices:
       - /dev/bus/usb
       - /dev/snd
-    volumes:
-      - /run/udev:/run/udev:ro
 
 volumes:
   roon-bridge-data:
